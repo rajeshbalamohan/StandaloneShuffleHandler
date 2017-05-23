@@ -78,6 +78,7 @@ public class ShuffleHandler {
       String baseDir) throws Exception {
     this.baseDir = baseDir;
     conf = new Configuration();
+    System.out.println("Init part..");
     serviceInit(conf);
     serviceStart();
   }
@@ -92,6 +93,7 @@ public class ShuffleHandler {
     }
     bootstrap.setPipelineFactory(pipelineFact);
     port = 8888;
+    System.out.println("Port : " + port);
     Channel ch = bootstrap.bind(new InetSocketAddress(port));
     accepted.add(ch);
     port = ((InetSocketAddress) ch.getLocalAddress()).getPort();
@@ -107,10 +109,12 @@ public class ShuffleHandler {
         .setNameFormat("ShuffleHandler Netty Worker #%d")
         .build();
 
+    System.out.println("Creating selector");
     selector = new NioServerSocketChannelFactory(
         Executors.newCachedThreadPool(bossFactory),
         Executors.newCachedThreadPool(workerFactory));
 
+    System.out.println("Done with service Init");
   }
 
   protected Shuffle getShuffle(Configuration conf) {

@@ -1,7 +1,13 @@
 package org.apache.jmeter;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.mapred.ShuffleHeader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -9,6 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Simple shuffle request generator.
@@ -43,6 +50,8 @@ public class RequestGenerator {
       sb.append(",");
       sb.append(mapId);
     }
+    //Always use keepAlive
+    sb.append("&keepAlive=true");
     url = new URL(sb.toString());
     //System.out.println("URL : " + url);
   }
@@ -121,6 +130,36 @@ public class RequestGenerator {
     }
   }
 
+  class Worker implements Runnable {
+    public void run() {
+     try {
+       downloadData();
+     } catch(IOException e) {
+       e.printStackTrace();
+     }
+    }
+  }
+
+  public final AtomicBoolean greenFlag = new AtomicBoolean();
+
+  public void downloadData(boolean viaThread) throws IOException {
+    if (viaThread) {
+      Thread t = new Thread(new Worker());
+      t.start();
+      while(!greenFlag.get()) {
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      //interrupt intensionally to mess up
+      t.interrupt();
+    } else {
+      downloadData();
+    }
+  }
+
   public void downloadData() throws IOException {
     for (String attemptId : attemptIds) {
       ShuffleHeader header = new ShuffleHeader();
@@ -141,9 +180,19 @@ public class RequestGenerator {
             "expected partition: " + this.reducerId);
       }
 
+      System.out.println("HEader : " + header.toString());
+
       byte[] b = new byte[(int) header.getCompressedLength()];
-      IOUtils.readFully(din, b, 0, b.length);
+      // IOUtils.readFully(din, b, 0, b.length);
+      CompressionCodecFactory codecFactory = new CompressionCodecFactory(new Configuration());
+      CompressionCodec codec = codecFactory.getCodecByClassName(DefaultCodec
+          .class.getName());
+
+      b = new byte[(int) header.getUncompressedLength()];
+      greenFlag.set(true);
+      IFile.Reader.readToMemory(b, din, (int)header.getCompressedLength(), codec, false, 4096);
       System.out.println("Read..." + header.getCompressedLength());
+      greenFlag.set(false);
     }
   }
 
@@ -152,10 +201,12 @@ public class RequestGenerator {
       if (din != null) {
         din.close();
       }
+      /*
       if (connection != null) {
         connection.disconnect();
         connection = null;
       }
+      */
     } catch(Exception e) {
       //ignore
     }

@@ -27,7 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 
-class IndexCache {
+public class IndexCache {
 
   private final JobConf conf;
   private final int totalMemoryAllowed;
@@ -65,6 +65,7 @@ class IndexCache {
     IndexInformation info = cache.get(mapId);
 
     if (info == null) {
+      System.out.println("Reading from " + fileName + ", mapId:" + mapId);
       info = readIndexFileToCache(fileName, mapId, expectedIndexOwner);
     } else {
       synchronized(info) {
@@ -190,7 +191,7 @@ class IndexCache {
 
     int getSize() {
       return mapSpillRecord == null
-          ? 0
+          ? 1 //intensional for LLAP
           : mapSpillRecord.size() * MapTask.MAP_OUTPUT_INDEX_RECORD_LENGTH;
     }
   }

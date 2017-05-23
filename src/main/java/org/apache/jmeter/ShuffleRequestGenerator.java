@@ -59,8 +59,13 @@ public class ShuffleRequestGenerator extends AbstractJavaSamplerClient
           ("host"), context.getIntParameter("port"),
           context.getParameter("jobId"), mapIdSet, context.getIntParameter
           ("reducerId"));
+      long sTime = System.currentTimeMillis();
       generator.connect(RequestGenerator.CONNECTION_TIMEOUT);
+      long eTime = System.currentTimeMillis();
+      System.out.println("Connect time : " + (eTime - sTime));
       generator.downloadData();
+      // In case we need to mess up downloading, uncomment following
+      //generator.downloadData(true);
       generator.disconnect();
     } catch (IOException e) {
       e.printStackTrace();
